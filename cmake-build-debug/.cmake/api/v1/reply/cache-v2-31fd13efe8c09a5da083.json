@@ -55,7 +55,7 @@
 				}
 			],
 			"type" : "INTERNAL",
-			"value" : "/home/ghassan/Desktop/RealTimeProject1/cmake-build-debug"
+			"value" : "/home/abbas-nassar/Desktop/Home/realTime/firstProject/RealTimeProject1/cmake-build-debug"
 		},
 		{
 			"name" : "CMAKE_CACHE_MAJOR_VERSION",
@@ -171,7 +171,7 @@
 				}
 			],
 			"type" : "FILEPATH",
-			"value" : "/usr/bin/gcc-ar-11"
+			"value" : "/usr/bin/gcc-ar-14"
 		},
 		{
 			"name" : "CMAKE_C_COMPILER_RANLIB",
@@ -187,7 +187,7 @@
 				}
 			],
 			"type" : "FILEPATH",
-			"value" : "/usr/bin/gcc-ranlib-11"
+			"value" : "/usr/bin/gcc-ranlib-14"
 		},
 		{
 			"name" : "CMAKE_C_FLAGS",
@@ -415,7 +415,7 @@
 				}
 			],
 			"type" : "STATIC",
-			"value" : "/home/ghassan/Desktop/RealTimeProject1/cmake-build-debug/CMakeFiles/pkgRedirects"
+			"value" : "/home/abbas-nassar/Desktop/Home/realTime/firstProject/RealTimeProject1/cmake-build-debug/CMakeFiles/pkgRedirects"
 		},
 		{
 			"name" : "CMAKE_GENERATOR",
@@ -427,7 +427,7 @@
 				}
 			],
 			"type" : "INTERNAL",
-			"value" : "Ninja"
+			"value" : "Unix Makefiles"
 		},
 		{
 			"name" : "CMAKE_GENERATOR_INSTANCE",
@@ -475,7 +475,7 @@
 				}
 			],
 			"type" : "INTERNAL",
-			"value" : "/home/ghassan/Desktop/RealTimeProject1"
+			"value" : "/home/abbas-nassar/Desktop/Home/realTime/firstProject/RealTimeProject1"
 		},
 		{
 			"name" : "CMAKE_INSTALL_PREFIX",
@@ -522,12 +522,16 @@
 			"properties" : 
 			[
 				{
+					"name" : "ADVANCED",
+					"value" : "1"
+				},
+				{
 					"name" : "HELPSTRING",
-					"value" : "No help, variable specified on the command line."
+					"value" : "Path to a program."
 				}
 			],
-			"type" : "UNINITIALIZED",
-			"value" : "/snap/clion/326/bin/ninja/linux/x64/ninja"
+			"type" : "FILEPATH",
+			"value" : "/usr/bin/gmake"
 		},
 		{
 			"name" : "CMAKE_MODULE_LINKER_FLAGS",
@@ -1023,7 +1027,7 @@
 				}
 			],
 			"type" : "STATIC",
-			"value" : "/home/ghassan/Desktop/RealTimeProject1/cmake-build-debug"
+			"value" : "/home/abbas-nassar/Desktop/Home/realTime/firstProject/RealTimeProject1/cmake-build-debug"
 		},
 		{
 			"name" : "RealTimeProject1_IS_TOP_LEVEL",
@@ -1047,7 +1051,7 @@
 				}
 			],
 			"type" : "STATIC",
-			"value" : "/home/ghassan/Desktop/RealTimeProject1"
+			"value" : "/home/abbas-nassar/Desktop/Home/realTime/firstProject/RealTimeProject1"
 		},
 		{
 			"name" : "_CMAKE_LINKER_PUSHPOP_STATE_SUPPORTED",

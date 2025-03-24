@@ -1,0 +1,1 @@
+/usr/bin/cc -g CMakeFiles/RealTimeProject1.dir/main.c.o CMakeFiles/RealTimeProject1.dir/src/config.c.o -o RealTimeProject1
