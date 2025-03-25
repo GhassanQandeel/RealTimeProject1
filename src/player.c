@@ -1,51 +1,82 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <signal.h>
-#include <sys/wait.h>
 #include <unistd.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <signal.h>
+#include <string.h>
+#include <fcntl.h>
+#include <sys/stat.h>
 #include <time.h>
+#include <math.h>
+
 #include "../include/config.h"
 
+
+Config config;
 int NUM_PLAYERS_PER_TEAM=4;
 
-typedef enum { TEAM_1, TEAM_2 } team_id;
-
-typedef struct {
-    int min_energy;
-    int max_energy;
-    int min_decrease;
-    int max_decrease;
-    int min_recovery;
-    int max_recovery;
-    float fall_probability;
-} player_config;
-
-typedef struct {
-    team_id team;
-    int player_num;
-    int energy;
-    int decrease_rate;
-    int position;
-    int pipe_fd[2];  // Pipe for communication with referee
-    player_config config;
-} player_state;
-
 void handle_signal(int sig);
-void send_init_ack();
+int generate_energy(int player_id);
+
 player_state* player_init(team_id team, int player_num, player_config config);
 void player_process(team_id team, int player_num, player_config config);
 
-int main (void){
+int fd;
 
+int main (int argc, char **argv){
+
+     if (argc < 2) {
+        fprintf(stderr, "Usage: %s <fifo_name>\n", argv[0]);
+        return EXIT_FAILURE;
+    }
+   if (load_config(argv[1], &config) != 0) {
+        fprintf(stderr, "Failed to load config file.\n");
+        return EXIT_FAILURE;
+    }
+
+    
+
+
+     fd = open(argv[2], O_WRONLY);
+    if (fd == -1) {
+        perror("open");
+        return EXIT_FAILURE;
+    }
+	
+    
+    write(fd, message, strlen(message));
+
+    close(fd);
+    return 0;
 }
+
+int generate_energy(int player_id){
+    srand(time(NULL) + player_id);
+    int energy = config.initial_energy_min[player_id] + 
+                 (rand() % (config.initial_energy_max[player_id] - config.initial_energy_min[player_id] + 1));
+
+    return energy;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 void handle_signal(int sig){
 
-}
-
-void send_init_ack() {
-    // Simple signal-based alternative
-    kill(getppid(), SIGUSR1);  // Notify parent we're ready
 }
 
 player_state* player_init(team_id team, int player_num, player_config config) {
@@ -117,5 +148,10 @@ void player_process(team_id team, int player_num, player_config config) {
 
     // Cleanup (would be called on termination)
     free(player);
+}
+void printConfig(const Config *cfg) {
+    printf("\n=== Config Values ===\n");
+    printf("Max Score: %d\n", cfg->max_score);
+    printf("Max Time: %d\n", cfg->max_time);
 }
 

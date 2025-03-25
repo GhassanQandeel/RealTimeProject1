@@ -2,7 +2,7 @@ Ghassan Qandeel
 ####################################################
 
 1- we should begin with referee file create two signals to handle time of 
-game and score that cant exceed it after read all user defiend configration
+game and score that cant exceed it after read all user defined configration
 file 
 
 2- we need to begin in referee file with create 8 fifo where 8 is private 
@@ -15,8 +15,8 @@ file
 
 * for player file we will also pass config file to it
 * we will open it fifo 
-* we will handle getready signal reciver  to begin generate energy
-* we will handle startRound signal reciver to begin round 
+* we will handle getready signal receiver  to begin generate energy
+* we will handle startRound signal receiver to begin round
 * calculate the effort the process make or player then send it as   
 
 ///////////////////////

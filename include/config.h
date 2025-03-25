@@ -26,8 +26,8 @@ typedef struct {
 typedef struct {
     int team_id;
     int score;
+    int player_id[4];
     int initial_energy[4];
-    //int deceased [3];
     pid_t players[4];
 } Team;
 

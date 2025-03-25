@@ -2,7 +2,7 @@
 
 # Game settings
 max_score=4                   # Maximum score to end the game
-max_time=80                   # Maximum time (in seconds) for the game
+max_time=80                  # Maximum time (in seconds) for the game
 
 # User Defined Range for High level of energy generated
 

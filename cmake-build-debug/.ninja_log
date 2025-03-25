@@ -1,15 +1,5 @@
 # ninja log v6
-63	140	1742597021120639091	RealTimeProject1	ca63a000b18e2012
-2	180	1742676535156155114	CMakeFiles/RealTimeProject1.dir/main.c.o	cf683d199112bba7
-2	120	1742677025705628450	build.ninja	5d1c5a198ae3f1b7
-1	126	1742677025726630876	CMakeFiles/RealTimeProject1.dir/main.c.o	17aafbeee9ae486d
-5	169	1742677025727630991	CMakeFiles/RealTimeProject1.dir/src/config.c.o	48ebdcce7b89852c
-169	253	1742677025891649936	RealTimeProject1	412aea1439d93ad1
-0	54	1742677043995741227	CMakeFiles/RealTimeProject1.dir/main.c.o	17aafbeee9ae486d
-54	116	1742677044046747120	RealTimeProject1	412aea1439d93ad1
-0	71	1742677111607554381	CMakeFiles/RealTimeProject1.dir/main.c.o	17aafbeee9ae486d
-71	185	1742677111678562589	RealTimeProject1	412aea1439d93ad1
-0	52	1742677135918364786	CMakeFiles/RealTimeProject1.dir/main.c.o	17aafbeee9ae486d
-52	95	1742677135970370798	RealTimeProject1	412aea1439d93ad1
-1	220	1742678881730396300	CMakeFiles/RealTimeProject1.dir/main.c.o	17aafbeee9ae486d
 220	335	1742678881948421646	RealTimeProject1	412aea1439d93ad1
+1	220	1742678881730396300	CMakeFiles/RealTimeProject1.dir/main.c.o	17aafbeee9ae486d
+2	120	1742846675155080369	build.ninja	5d1c5a198ae3f1b7
+5	169	1742677025727630991	CMakeFiles/RealTimeProject1.dir/src/config.c.o	48ebdcce7b89852c
