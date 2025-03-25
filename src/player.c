@@ -12,9 +12,12 @@
 
 #include "../include/config.h"
 
+typedef void (*sighandler_t)(int);
+sighandler_t sigset(int sig, sighandler_t disp);
 
 Config config;
 int NUM_PLAYERS_PER_TEAM=4;
+
 
 void handle_getready();
 int generate_energy(int id);
@@ -70,7 +73,11 @@ int main (int argc, char **argv){
     printf("Initial energy sent successfully.\n");
     
     
-    signal(SIGUSR1,handle_getready());
+    if ( sigset(SIGUSR1, handle_getready) == SIG_ERR ) {
+    perror("Sigset can not set SIGUSR1");
+    exit(SIGQUIT);
+  }
+    pause();
     
     
     
@@ -91,7 +98,8 @@ int generate_energy(int id) {
 
 
 void handle_getready(){
-
+	/* For get ready signal with our implemintion is just for alignment the players in openGl */
+		printf("SIGUSR1 reciv %d ",getpid());
 
 }
 

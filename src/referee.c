@@ -14,6 +14,8 @@ Config config;
 void printConfig(const Config *cfg);
 void print_team(const Team *team);
 void handle_alarm_max_time();
+void sort_team_energy();
+void send_getready_signal();
 char fifo_name[8][50];
 pid_t player[8];
 Team team_1;
@@ -111,13 +113,11 @@ int main(int argc, char **argv) {
        // so, we will send get ready signal , player will recive it ,player will send first node( Player data ) after generate
        // its energy , then will parent store player in teams ,from parent will draw easly .
        
+ 
        
-       
-
+    /* Recive initial energy */
     Message msg;
     int received_count = 0;  // Track received messages
-    
-
     while (received_count < 8) {
          for (int i = 0; i < 8; i++) {
               int n = read(fd[i], &msg, sizeof(Message));
@@ -144,10 +144,45 @@ int main(int argc, char **argv) {
 	printf("\nFinal Team Data:\n");
 	print_team(&team_1);
 	print_team(&team_2);
-
+	/* Recive initial energy */
+	
+	
+	/*for get data we suppose to get initial energy at first of program , for update the energy we send energy in last of round so we can be updated with current energy */
+	send_getready_signal();
+	/*now we sorted players in program and plot it in sorted way */
+	//sort_team_energy();
+	
+	
 
     return 0;
 }
+
+sort_team_energy(){
+/*Here we need to way to map cuurent energy that */
+
+
+
+}
+void send_getready_signal(){
+
+/*Here we will kill all SIGUSR1 for all child to know getready message or signal */   
+    	for(int  i = 0 ; i<4 ; i++ ){
+    	
+    	 	if (kill(team_1.players[i], SIGUSR1) == 0) {
+        		printf("Send signal to process %d From team 1.\n",team_1.players[i]);
+    		} else {
+        		perror("kill failed for team 1");
+    		}
+    		if (kill(team_2.players[i], SIGUSR1) == 0) {
+        		printf("Send signal to process %d From team 2.\n", team_2.players[i]);
+    		} else {
+        		perror("kill failed for team 2");
+    		}
+    		
+    	    }
+
+}
+
 
 void handle_alarm_max_time() {
     printf("Referee: Maximum time reached\n");
