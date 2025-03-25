@@ -35,6 +35,7 @@ typedef struct {
 typedef struct {
     int type;
     int player_id;
+    pid_t player_pid;
     int team_id;
     char content[20];
 } Message;
