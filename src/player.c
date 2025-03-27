@@ -99,7 +99,7 @@ int generate_energy(int id) {
 
 void handle_getready(){
 	/* For get ready signal with our implemintion is just for alignment the players in openGl */
-		printf("SIGUSR1 reciv %d ",getpid());
+		printf("SIGUSR1 %d \n",getpid());
 
 }
 
