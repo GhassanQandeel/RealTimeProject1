@@ -1,5 +1,0 @@
-# ninja log v6
-220	335	1742678881948421646	RealTimeProject1	412aea1439d93ad1
-1	220	1742678881730396300	CMakeFiles/RealTimeProject1.dir/main.c.o	17aafbeee9ae486d
-2	120	1742846675155080369	build.ninja	5d1c5a198ae3f1b7
-5	169	1742677025727630991	CMakeFiles/RealTimeProject1.dir/src/config.c.o	48ebdcce7b89852c

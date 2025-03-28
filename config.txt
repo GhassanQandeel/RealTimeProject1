@@ -26,9 +26,6 @@ rate_of_decrease_max=10		# Maximum Rate of Decrease
 re_join_time_min=2		# Minimum Time for re-join the game 
 re_join_time_max=3		# Maximum Time for re-join the game
  
-# Rest time before next jump
-rest_time_max=200
-rest_time_min=100
 
 # Win Threshold 
 win_threshold=150
