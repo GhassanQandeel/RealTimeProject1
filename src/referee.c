@@ -22,7 +22,9 @@ void receive_energy(int message_type);
 void print_current_array();
 int check_winner();
 int check_winner_in_row();
+int check_win_tie();
 int  first_energy=0;
+
 int max_win_in_row;
 int diifernce_effort=0;/*if pos then team 1 win*/
 
@@ -156,7 +158,10 @@ int main(int argc, char **argv) {
 	printf("|||||||||||||||||||||||||First time|||||||||||||||||||||||\n");
 	
 	while(1){
-		if(){}
+		if(time_is_over==1)
+		break;
+		else if(check_winner()==1||check_winner()==2)
+		break;
 		else{
 		if(first_time == 0){
 		
@@ -187,6 +192,19 @@ int main(int argc, char **argv) {
 	}
 	}
 	}
+	int c_winner=check_winner();
+	int c_win_tie=check_win_tie();
+	
+	if((c_winner==1)||(c_win_tie==1))
+	printf("ss");
+	/*Send win message to team 1 */
+	else if((c_winner==2)||(c_win_tie==2))
+	printf("ss");
+	/*Send win message to team 2*/
+	else
+	printf("ss");
+	/*Tie for both teams*/ 
+	
 	
 	
 	
@@ -287,10 +305,14 @@ void receive_energy(int message_type) {
     if(diifernce_effort>=config.win_threshold){
     team_1.score+=1;
     diifernce_effort=0;
+    team_1.win_counter++;
+    team_2.win_counter=0;
     }
     else if(diifernce_effort<=(-1 * config.win_threshold)){
     team_2.score+=1;
     diifernce_effort=0;
+    team_2.win_counter++;
+    team_1.win_counter=0;
  	}
 }
 
@@ -380,6 +402,16 @@ int check_winner(){
 	return 2 ;
 	else
 	return 0 ;
+}
+int check_win_tie(){
+	if (team_1.score>team_2.score)
+	return 1;//team 1 win
+	else if(team_1.score<team_2.score)
+	return 2;//team2 win
+	else if(team_1.score==team_2.score)
+	return 0;// tie
+	
+	return -1;
 }
 
 
