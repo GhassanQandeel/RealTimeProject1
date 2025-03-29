@@ -26,6 +26,7 @@ typedef struct {
 typedef struct {
     int team_id;
     int score;
+    int win_counter;
     int player_id[4];
     int initial_energy[4];
     pid_t players[4];

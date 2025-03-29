@@ -20,7 +20,12 @@ void send_getready_signal();
 void send_start_game_signal();
 void receive_energy(int message_type);
 void print_current_array();
+int check_winner();
+int check_winner_in_row();
 int  first_energy=0;
+int max_win_in_row;
+int diifernce_effort=0;/*if pos then team 1 win*/
+
 char fifo_name[8][50];
 pid_t player[8];
 Team team_1;
@@ -30,7 +35,12 @@ int current_energy_team_2[2][4];/*to give us good control in teams energy */
 int team_id;
 int player_id;
 int fd[8];
-
+int first_time=0;
+int time_is_over=0;
+/* Last update */
+/* Check end game condition and round update*/
+/* put in if stop condiition , after time end ,check how larger ,  */
+/* Waht should do*/
 int main(int argc, char **argv) {
 
 
@@ -45,6 +55,7 @@ int main(int argc, char **argv) {
         fprintf(stderr, "Failed to load config file.\n");
         return EXIT_FAILURE;
     }
+    max_win_in_row=(config.max_score/2)+1;
 	/* Read  Configuration file */ 
     
 
@@ -123,29 +134,59 @@ int main(int argc, char **argv) {
  
        receive_energy(1);
  
+	/*
 	printf("\nFinal Team Data:\n");
 	print_team(&team_1);
 	print_team(&team_2);
+	*/
+	
 	/* Recive initial energy */
 	
 	
 	/*for get data we suppose to get initial energy at first of program , 
 	for update the energy we send energy in last of round so we can be updated with current energy */
 	
-	//send_getready_signal();
+	send_getready_signal();
 	/*now we sorted players in program and plot it in sorted way */
 	load_current_energy(0);
+	// send function to plot
+	
 	printf("|||||||||||||||||||||||||First time|||||||||||||||||||||||\n");
 	print_current_array();
 	printf("|||||||||||||||||||||||||First time|||||||||||||||||||||||\n");
 	
-	send_start_game_signal();
-	receive_energy(2);
-	load_current_energy(1);
-	printf("|||||||||||||||||||||||||Second time|||||||||||||||||||||||\n");
-	print_current_array();
-	printf("|||||||||||||||||||||||||Second time|||||||||||||||||||||||\n");
+	while(1){
+		if(){}
+		else{
+		if(first_time == 0){
+		
 	
+		send_start_game_signal();
+		receive_energy(2);
+		load_current_energy(1);
+		//check if exceed the thresold of win round 
+		// if yes incerement score for team 
+		printf("|||||||||||||||||||||||||Second time|||||||||||||||||||||||\n");
+		print_current_array();
+		printf("|||||||||||||||||||||||||Second time|||||||||||||||||||||||\n");
+	}
+	else{
+	
+		send_getready_signal();
+		// send function to plot
+		send_start_game_signal();
+		receive_energy(2);
+		load_current_energy(1);
+		//check if exceed the thresold of win round 
+		// if yes incerement score for team 
+		/*for alarm we will check alarm flag also */
+		// for case of win some rounds in countinue we will make two variabels counters and check it to value in config file 
+		printf("|||||||||||||||||||||||||Second time|||||||||||||||||||||||\n");
+		print_current_array();
+		printf("|||||||||||||||||||||||||Second time|||||||||||||||||||||||\n");
+	}
+	}
+	}
 	
 	
 	
@@ -196,11 +237,13 @@ void receive_energy(int message_type) {
                 team_1.player_id[msg.player_id] = msg.player_id;
                 team_1.players[msg.player_id] = msg.player_pid;
                 team_1.initial_energy[msg.player_id] = atoi(msg.content);
+                team_1.win_counter=0;
             } else {
                 team_2.team_id = msg.team_id;
                 team_2.player_id[msg.player_id] = msg.player_id;
                 team_2.players[msg.player_id] = msg.player_pid;
                 team_2.initial_energy[msg.player_id] = atoi(msg.content);
+            	team_2.win_counter=0;
             }
         } else if(msg.type == message_type && message_type==2 && msg.type==2){ 
         	 // Update energy based on effort
@@ -223,7 +266,7 @@ void receive_energy(int message_type) {
                 current_effort_with_weight = current_effort * (current_player + 1);
                 current_energy_team_1[0][current_player] -= current_effort_with_weight;
                 total_effort_team_1 += current_effort_with_weight;
-		printf("current_effort = %d,current_effort_with_weight = %d  total_effort_team_1= %d \n",current_effort,current_effort_with_weight,total_effort_team_1);
+		printf("current_effort = %d ,current_effort_with_weight = %d  total_effort_team_1= %d (player_id =%d),team_id = %d , player in sorted array =%d\n",current_effort,current_effort_with_weight,total_effort_team_1,msg.player_id,msg.team_id,current_player);
             } else {  // Team 2
                 for (int j = 0; j < 4; j++) {
                     if (current_energy_team_2[1][j] == msg.player_id) {
@@ -236,10 +279,19 @@ void receive_energy(int message_type) {
                 current_effort_with_weight = current_effort * (current_player + 1);
                 current_energy_team_2[0][current_player] -= current_effort_with_weight;
                 total_effort_team_2 += current_effort_with_weight;
-                printf("current_effort = %d,current_effort_with_weight = %d  total_effort_team_2= %d \n",current_effort,current_effort_with_weight,total_effort_team_2);
+                printf("current_effort = %d,current_effort_with_weight = %d  total_effort_team_2= %d (player_id =%d),team_id = %d , player in sorted array =%d\n",current_effort,current_effort_with_weight,total_effort_team_2,msg.player_id,msg.team_id,current_player);
             }
         }
     }
+    diifernce_effort+=(total_effort_team_1-total_effort_team_2);
+    if(diifernce_effort>=config.win_threshold){
+    team_1.score+=1;
+    diifernce_effort=0;
+    }
+    else if(diifernce_effort<=(-1 * config.win_threshold)){
+    team_2.score+=1;
+    diifernce_effort=0;
+ 	}
 }
 
 
@@ -249,19 +301,17 @@ void load_current_energy(int w_time) {
         first_energy = 1; 
        for (int i = 0; i < 4; i++) {
             current_energy_team_1[0][i] = team_1.initial_energy[i]; // Store energy
-            current_energy_team_1[1][i] = team_1.player_id[i];       // Store player ID
+            current_energy_team_1[1][i] = team_1.player_id[i];      // Store player ID
         }
         for (int i = 0; i < 4; i++) {
             current_energy_team_2[0][i] = team_2.initial_energy[i]; // Store energy
-            current_energy_team_2[1][i] = team_2.player_id[i];       // Store player ID
+            current_energy_team_2[1][i] = team_2.player_id[i];      // Store player ID
         }
         
         
         sort_main_array(current_energy_team_1);
         sort_main_array(current_energy_team_2);
         
-       
-            
             
     } else if(w_time == 1) {
     	sort_main_array(current_energy_team_1);
@@ -270,42 +320,42 @@ void load_current_energy(int w_time) {
     }
 }
 void send_getready_signal(){
-	printf("////////////////SIGUSR1///////////////////\n");
+	//printf("////////////////SIGUSR1///////////////////\n");
 
 /*Here we will kill all SIGUSR1 for all child to know getready message or signal */   
     	for(int  i = 0 ; i<4 ; i++ ){
     	 	if (kill(team_1.players[i], SIGUSR1) == 0) {
-        		printf("Send signal to process %d From team 1.\n",team_1.players[i]);
+        		//printf("Send signal to process %d From team 1.\n",team_1.players[i]);
     		} else {
         		perror("kill failed for team 1");
     		}
     		}
     		for(int  i = 0 ; i<4 ; i++ ){
     		if (kill(team_2.players[i], SIGUSR1) == 0) {
-        		printf("Send signal to process %d From team 2.\n", team_2.players[i]);
+        		//printf("Send signal to process %d From team 2.\n", team_2.players[i]);
     		} else {
         		perror("kill failed for team 2");
     		}
     		}
     		
     	    
-    	    printf("////////////////SIGUSR1///////////////////\n");
+    	   // printf("////////////////SIGUSR1///////////////////\n");
 
 }
 void send_start_game_signal(){
 
 /*Here we will kill all SIGUSR2 for all child to know start game message or signal */   
-	printf("////////////////SIGUSR2///////////////////\n");        		
+	//printf("////////////////SIGUSR2///////////////////\n");        		
     	for(int  i = 0 ; i<4 ; i++ ){
     	 	if (kill(team_1.players[i], SIGUSR2) == 0) {
-        		printf("Send signal to process %d From team 1.\n",team_1.players[i]);
+        		//printf("Send signal to process %d From team 1.\n",team_1.players[i]);
     		} else {
         		perror("kill failed for team 1");
     		}
     		}
     		for(int  i = 0 ; i<4 ; i++ ){
     		if (kill(team_2.players[i], SIGUSR2) == 0) {
-        		printf("Send signal to process %d From team 2.\n", team_2.players[i]);
+        		//printf("Send signal to process %d From team 2.\n", team_2.players[i]);
     		} else {
         		perror("kill failed for team 2");
     		}
@@ -320,7 +370,21 @@ void send_start_game_signal(){
 
 void handle_alarm_max_time() {
     printf("Referee: Maximum time reached\n");
+    time_is_over=1;
 }
+
+int check_winner(){
+	if((team_1.score==config.max_score)||(max_win_in_row==team_1.win_counter))
+	return 1;
+	else if((team_2.score==config.max_score)||(max_win_in_row==team_2.win_counter))
+	return 2 ;
+	else
+	return 0 ;
+}
+
+
+
+
 void print_current_array(){
  	printf("Sorted Energy Levels:\n");
         printf("Team 1:\n");

@@ -116,7 +116,7 @@ void handle_start_game(){
 	srand(time(NULL) ^ getpid());  
     	int effort = config.rate_of_decrease_min + (rand() % (config.rate_of_decrease_max - config.rate_of_decrease_min + 1));
         
-        printf("player %d palyer_id %d make effort = %d\n",getpid(),player_id,effort);         
+        printf("player %d palyer_id %d team_id %d make effort = %d\n",getpid(),player_id,team_id,effort);         
 	
 	/*3- send the effort */
    	send_message(2,effort);
