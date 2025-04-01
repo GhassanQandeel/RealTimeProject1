@@ -1,0 +1,10 @@
+
+Update Package Lists:--> sudo apt update
+	
+Install OpenGL Libraries: --> sudo apt install mesa-utils
+	
+Install Development Libraries--> sudo apt install libgl1-mesa-dev
+	
+Verify Installation--> glxinfo | grep "OpenGL version"
+gcc parent.c -o parent -lGL -lGLU -lglfw -lGLEW -lglut -lm
+./parent
