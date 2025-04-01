@@ -70,13 +70,17 @@ int main (int argc, char **argv){
     perror("Sigset can not set SIGUSR2");
     exit(SIGQUIT);
     }
-    pause();
     
-    
+    while (1) {
+        sleep(1); // Simulate player waiting for actions
+        printf("Player process running...\n");
+    }
 
-    close(fd);
     return 0;
+    
+    
 
+   
 }
 
 
