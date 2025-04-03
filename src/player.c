@@ -19,16 +19,18 @@ Config config;
 int NUM_PLAYERS_PER_TEAM=4;
 
 
+volatile sig_atomic_t keep_running = 1;  // Global flag to control the loop
+
+void handle_sigint(int sig);
 void handle_getready();
 void handle_start_game();
 void send_message(int message_type,int content);
 int generate_energy(int id);
 
 
-int fd;
+int fd_read, fd_write;
 int player_id,team_id;
 pid_t player;
-
 
 
 int main (int argc, char **argv){
@@ -43,11 +45,19 @@ int main (int argc, char **argv){
         return EXIT_FAILURE;
    }
    
-   fd = open(argv[2], O_WRONLY);
-    if (fd == -1) {
+    fd_write = open(argv[2], O_WRONLY);
+    if (fd_write == -1) {
         perror("open");
         return EXIT_FAILURE;
     }
+
+     // Open FIFO for reading (from referee)
+     fd_read = open(argv[2], O_RDONLY | O_NONBLOCK);
+     if (fd_read == -1) {
+         perror("open read FIFO");
+         close(fd_write);
+         return EXIT_FAILURE;
+     }
    
    player_id=atoi(argv[3]);
    team_id=atoi(argv[4]);
@@ -70,17 +80,28 @@ int main (int argc, char **argv){
     perror("Sigset can not set SIGUSR2");
     exit(SIGQUIT);
     }
+
+    signal(SIGINT, handle_sigint);
     
-    while (1) {
-        sleep(1); // Simulate player waiting for actions
-        printf("Player process running...\n");
+    while (keep_running) {
+        pause();
+        // Message msg;
+        // int n = read(fd_read, &msg, sizeof(Message));
+        
+        // if (n > 0) {
+        //     if (msg.type == 3) { // Winner message
+        //         printf("Player %d: We won the game!\n", player_id);
+        //         keep_running = 0;
+        //     } 
+        //     else if (msg.type == 4) { // Loser message
+        //         printf("Player %d: We lost the game.\n", player_id);
+        //         keep_running = 0;
+        //     }
+        // }
     }
-
+    close(fd_read);
+    close(fd_write);
     return 0;
-    
-    
-
-   
 }
 
 
@@ -100,7 +121,7 @@ void send_message(int message_type,int content){
     snprintf(msg.content, sizeof(msg.content), "%d", content);
 
     // Send message through FIFO
-    if (write(fd, &msg, sizeof(Message)) == -1) {
+    if (write(fd_write, &msg, sizeof(Message)) == -1) {
         perror("write");
         
     }
@@ -131,5 +152,9 @@ void printConfig(const Config *cfg) {
     printf("\n=== Config Values ===\n");
     printf("Max Score: %d\n", cfg->max_score);
     printf("Max Time: %d\n", cfg->max_time);
+}
+
+void handle_sigint(int sig) {
+    keep_running = 0;  // Set flag to exit the loop
 }
 

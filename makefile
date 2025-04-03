@@ -1,17 +1,34 @@
-LIBS = -lglut -lGLU -lGL -lm
+# Compiler and flags
 CC = gcc
-OBJECTS = parent
+CFLAGS = -Wall -Wextra -Iinclude/
+LDFLAGS = 
 
-all: $(OBJECTS)
+# Directories
+SRCDIR = src
+BINDIR = bin
+OBJDIR = obj
 
-%: %.c
-	$(CC) $< -o $@ $(LIBS)
+# Source files
+REF_SRC = $(SRCDIR)/referee.c $(SRCDIR)/config.c
+PLAYER_SRC = $(SRCDIR)/player.c $(SRCDIR)/config.c
 
-%.o: %.c
-	$(CC) $< -c -o $@ $(LIBS)
+# Targets
+all: $(BINDIR)/referee $(BINDIR)/player
 
-run: parent
-	./parent
+$(BINDIR)/referee: $(REF_SRC)
+	@mkdir -p $(BINDIR)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
+
+$(BINDIR)/player: $(PLAYER_SRC)
+	@mkdir -p $(BINDIR)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
+
+run: all
+	@rm -f /tmp/fifo_*
+	./$(BINDIR)/referee config.txt
 
 clean:
-	rm -f *.o $(OBJECTS)
+	rm -rf $(BINDIR)/*
+	rm -f /tmp/fifo_*
+
+.PHONY: all clean run

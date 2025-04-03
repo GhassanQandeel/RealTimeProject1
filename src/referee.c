@@ -9,6 +9,8 @@
 #include <sys/stat.h>
 #include "../include/config.h"
 
+volatile sig_atomic_t should_terminate = 1; 
+
 Config config;
 
 void printConfig(const Config *cfg);
@@ -20,13 +22,16 @@ void send_getready_signal();
 void send_start_game_signal();
 void receive_energy(int message_type);
 void print_current_array();
-int check_winner();
-int check_winner_in_row();
-int check_win_tie();
+void terminate_game();
+void check_winner();
+void check_winner_in_row();
+void check_win_tie();
+void send_winner_message(int team);
+void send_loser_message(int team);
 int  first_energy=0;
 
 int max_win_in_row;
-int diifernce_effort=0;/*if pos then team 1 win*/
+int difference_effort=0;/*if pos then team 1 win*/
 
 char fifo_name[8][50];
 pid_t player[8];
@@ -169,26 +174,9 @@ int main(int argc, char **argv) {
 	
 	
 	
-	while(1){
-		if(time_is_over==1)
-		break;
-		else if(check_winner()==1||check_winner()==2)
-		break;
-		else if(time_is_over == 0 || check_winner()== 0){
-		if(first_time == 0){
-		
-	
-		send_start_game_signal();
-		receive_energy(2);
-		load_current_energy(1);
-		//check if exceed the thresold of win round 
-		// if yes incerement score for team 
-		printf("|||||||||||||||||||||||||Second time|||||||||||||||||||||||\n");
-		print_current_array();
-		printf("|||||||||||||||||||||||||Second time|||||||||||||||||||||||\n");
-	}
-	else{
-	
+	while(should_terminate){
+        sleep(1);
+        check_winner();
 		send_getready_signal();
 		// send function to plot
 		send_start_game_signal();
@@ -198,29 +186,9 @@ int main(int argc, char **argv) {
 		// if yes incerement score for team 
 		/*for alarm we will check alarm flag also */
 		// for case of win some rounds in countinue we will make two variabels counters and check it to value in config file 
-		printf("|||||||||||||||||||||||||Second time|||||||||||||||||||||||\n");
 		print_current_array();
-		printf("|||||||||||||||||||||||||Second time|||||||||||||||||||||||\n");
-	}
-	}
-	}
-	int c_winner=check_winner();
-	int c_win_tie=check_win_tie();
-	
-	if((c_winner==1)||(c_win_tie==1))
-	printf("1");
-	/*Send win message to team 1 */
-	else if((c_winner==2)||(c_win_tie==2))
-	printf("2");
-	/*Send win message to team 2*/
-	else
-	printf("tie");
-	/*Tie for both teams*/ 
-	
-	
-	
-	
 
+	}
     return 0;
     /*#################### Main ################################*/
 }
@@ -246,7 +214,9 @@ void sort_main_array(int current_energy_team[2][4]) {
     }
 }
 void receive_energy(int message_type) {
-    int received_count = 0;  
+    if (!should_terminate){
+        return;
+    }
     int total_effort_team_1 = 0;
     int total_effort_team_2 = 0;
 
@@ -315,23 +285,36 @@ void receive_energy(int message_type) {
             }
         }
     }
-    diifernce_effort+=(total_effort_team_1-total_effort_team_2);
-    if(diifernce_effort>=config.win_threshold){
-    team_1.score+=1;
-    diifernce_effort=0;
-    team_1.win_counter++;
-    team_2.win_counter=0;
+    difference_effort=(total_effort_team_1-total_effort_team_2);
+    if (difference_effort > 0){
+        team_1.score+=1;
+        team_1.win_counter++;
+        team_2.win_counter=0;
     }
-    else if(diifernce_effort<=(-1 * config.win_threshold)){
-    team_2.score+=1;
-    diifernce_effort=0;
-    team_2.win_counter++;
-    team_1.win_counter=0;
+    else if (difference_effort < 0){
+        team_2.score+=1;
+        team_2.win_counter++;
+        team_1.win_counter=0;
+    }
+    else if(total_effort_team_1 >= config.win_threshold){
+        team_1.score+=1;
+        team_1.win_counter++;
+        team_2.win_counter=0;
+    }
+    else if(total_effort_team_2 >= config.win_threshold){
+        team_2.score+=1;
+        team_2.win_counter++;
+        team_1.win_counter=0;
  	}
+    difference_effort=0;
+    // If the difference_effort == 0 do nothing
 }
 
 
 void load_current_energy(int w_time) {
+    if (!should_terminate){
+        return;
+    }
     /* If first_energy is 0, initialize energy from team structures */
     if (w_time == 0) {
         first_energy = 1; 
@@ -403,43 +386,154 @@ void send_start_game_signal(){
 }
 
 
-
 void handle_alarm_max_time() {
     printf("Referee: Maximum time reached\n");
-    time_is_over=1;
+    check_win_tie();
+    terminate_game();
 }
 
-int check_winner(){
-	if((team_1.score==config.max_score)||(max_win_in_row==team_1.win_counter))
-	return 1;
-	else if((team_2.score==config.max_score)||(max_win_in_row==team_2.win_counter))
-	return 2 ;
-	else
-	return 0 ;
+void terminate_game(){
+    // 1. Close all FIFO file descriptors
+    for (int i = 0; i < 8; i++) {
+        if (close(fd[i]) == -1) {
+            perror("Failed to close FIFO");
+        }
+    }
+
+    // 2. Remove (unlink) FIFO files
+    for (int i = 0; i < 8; i++) {
+        if (unlink(fifo_name[i]) == -1) {
+            perror("Failed to unlink FIFO");
+        } else {
+            printf("Removed FIFO: %s\n", fifo_name[i]);
+        }
+    }
+    
+    // 3. Kill all player processes
+    for (int i = 0; i < 4; i++) {
+        if (kill(team_1.players[i], SIGTERM) == 0) {
+            printf("Killed player with PID %d from team 1.\n", team_1.players[i]);
+        } else {
+            perror("Failed to kill player from team 1");
+        }
+    }
+    
+    for (int i = 0; i < 4; i++) {
+        if (kill(team_2.players[i], SIGTERM) == 0) {
+            printf("Killed player with PID %d from team 2.\n", team_2.players[i]);
+        } else {
+            perror("Failed to kill player from team 2");
+        }
+    }
+    should_terminate = 0;
 }
-int check_win_tie(){
-	if (team_1.score>team_2.score)
-	return 1;//team 1 win
-	else if(team_1.score<team_2.score)
-	return 2;//team2 win
-	else if(team_1.score==team_2.score)
-	return 0;// tie
-	
-	return -1;
+
+void check_winner(){
+	if((team_1.score==config.max_score)||(max_win_in_row==team_1.win_counter)){
+        printf("Team 1 has won :)\n");
+        //send_winner_message(0);
+        //send_loser_message(1);
+        terminate_game();
+    }
+	else if((team_2.score==config.max_score)||(max_win_in_row==team_2.win_counter)){
+        printf("Team 2 has won :)\n");
+       // send_winner_message(1);
+       // send_loser_message(0);
+        terminate_game();
+    }
 }
+void check_win_tie(){
+	if (team_1.score>team_2.score){
+        printf("Team 1 has won :)\n");
+        //send_winner_message(0);
+        //send_loser_message(1);
+    }	else if(team_1.score<team_2.score){
+        printf("Team 2 has won :)\n");
+      //  send_winner_message(1);
+      //  send_loser_message(0);
+    }
+	else if(team_1.score==team_2.score){
+        printf("Tie\n");
+        // Send message
+    }
+}
+void send_winner_message(int winning_team) {
+    Message msg;
+    msg.type = 3;  // Winner message type
+    msg.team_id = winning_team;
+    snprintf(msg.content, sizeof(msg.content), "Your team won!");
 
+    if (winning_team == 0) {
+        // Team 0 players (fd[0]-fd[3])
+        for (int i =0; i<4; i++){
+            msg.player_id = i;
+            msg.player_pid = team_1.players[i];
+            if (write(fd[i], &msg, sizeof(Message)) == -1) perror("Failed to send to player");
+        }
+    }
+    else {
+        // Team 1 players (fd[4]-fd[7])
+        for (int i =0; i<4; i++){
+            msg.player_id = i;
+            msg.player_pid = team_1.players[i];
+            if (write(fd[i+4], &msg, sizeof(Message)) == -1) perror("Failed to send to player");
+        }
+    }
+}
+void send_loser_message(int losing_team){
+    Message msg;
+    msg.type = 4;  // Loser message type
+    msg.team_id = losing_team;
+    snprintf(msg.content, sizeof(msg.content), "Your team lost.");
 
-
-
+    if (losing_team == 0) {
+        // Team 0 players (fd[0]-fd[3])
+        for (int i =0; i<4; i++){
+            msg.player_id = i;
+            msg.player_pid = team_1.players[i];
+            if (write(fd[i], &msg, sizeof(Message)) == -1) perror("Failed to send to player");
+        }
+    }
+    else {
+        // Team 1 players (fd[4]-fd[7])
+        for (int i =0; i<4; i++){
+            msg.player_id = i;
+            msg.player_pid = team_1.players[i];
+            if (write(fd[i+4], &msg, sizeof(Message)) == -1) perror("Failed to send to player");
+        }
+    }
+}
+void send_tie_message(){
+    Message msg;
+    msg.type = 5;  // tie message type
+    snprintf(msg.content, sizeof(msg.content), "Tie.");
+    for (int i =0; i<8; i++){
+        if (i < 4){
+            msg.player_id = i;
+            msg.player_pid = team_1.players[i];
+            if (write(fd[i], &msg, sizeof(Message)) == -1) perror("Failed to send to player");
+        }
+        else{
+            msg.player_id = i-4;
+            msg.player_pid = team_2.players[i-4];
+            if (write(fd[i], &msg, sizeof(Message)) == -1) perror("Failed to send to player");
+        }
+    }
+}
 void print_current_array(){
+    if (!should_terminate){
+        return;
+    }
  	printf("Sorted Energy Levels:\n");
         printf("Team 1:\n");
         for (int i = 0; i < 4; i++) 
             printf("Player %d  - Energy: %d\n", current_energy_team_1[1][i], current_energy_team_1[0][i]);
+        printf("Score for team 1: %d\n", team_1.score);
         printf("Team 2:\n");
         for (int i = 0; i < 4; i++) 
             printf("Player %d - Energy: %d\n", current_energy_team_2[1][i], current_energy_team_2[0][i]);
-            }
+        printf("Score for team 2: %d\n",team_2.score);             
+}   
 
 void printConfig(const Config *cfg) {
     printf("\n=== Config Values ===\n");
