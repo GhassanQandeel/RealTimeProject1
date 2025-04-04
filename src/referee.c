@@ -8,6 +8,12 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include "../include/config.h"
+#include <errno.h>
+#include <time.h>
+int player_pipes[8][2]; // [player][0=read, 1=write]
+int player_fell = 0;
+int team_id_fall = 0;
+int player_id_fall = 0;
 
 volatile sig_atomic_t should_terminate = 1; 
 
@@ -28,6 +34,10 @@ void check_winner_in_row();
 void check_win_tie();
 void send_winner_message(int team);
 void send_loser_message(int team);
+void send_tie_message();
+int get_random_in_range(int range_min, int range_max);
+void player_fallen();
+
 int  first_energy=0;
 
 int max_win_in_row;
@@ -71,10 +81,15 @@ int main(int argc, char **argv) {
     printf("Referee: Maximum time set to %d seconds\n", config.max_time);
     alarm(config.max_time);
 
+    for (int i = 0; i < 8; i++) {
+        if (pipe(player_pipes[i]) == -1) {
+            perror("pipe");
+            exit(EXIT_FAILURE);
+        }
+    }
 
     for(int  i = 0 ; i<8 ; i++ ){
     /* FIFO Creation */
-
 
         if(i  <= 3 ){
             team_id = 0;
@@ -86,7 +101,7 @@ int main(int argc, char **argv) {
 
     snprintf(fifo_name[i], sizeof(fifo_name),"/tmp/fifo_team_%d_player_%d",team_id, player_id);
     if (mkfifo(fifo_name[i], 0666) == -1) {
-        perror("mkfifo");
+        perror("mkfifo1");
         exit(1);
     }
     }
@@ -101,9 +116,6 @@ int main(int argc, char **argv) {
     for(int  i = 0 ; i<8 ; i++ ){
     if ((player [i]= fork()) == 0)
     {
-	
-
-
       if(i  <= 3 ){
         team_id = 0;
         player_id=i;
@@ -111,6 +123,13 @@ int main(int argc, char **argv) {
         team_id=1;
         player_id=i-4;
       }
+
+      close(player_pipes[i][1]);  // Close unused write end
+
+
+        // Convert read-FD to string and pass to player
+        char fd_str[16];
+        snprintf(fd_str, sizeof(fd_str), "%d", player_pipes[i][0]);
 
        
       // Child process (Player)
@@ -120,16 +139,20 @@ int main(int argc, char **argv) {
       snprintf(player_id_str, sizeof(player_id_str),"%d", player_id);
       snprintf(team_id_str, sizeof(team_id_str),"%d",team_id);
 
-      execlp("./bin/player","./bin/player", argv[1],fifo_name[i],player_id_str,team_id_str, NULL);
+      execlp("./bin/player","./bin/player", argv[1],fifo_name[i],player_id_str,team_id_str, fd_str, NULL);
       perror("execlp failed for player");
       exit(EXIT_FAILURE);
     } 
-        // Parent process (Referee)
-        fd[i] = open(fifo_name[i], O_RDONLY);
-        if (fd[i] < 0) {
-            perror("open");
-            exit(EXIT_FAILURE);
-        }
+    else{
+        close(player_pipes[i][0]);  // Close unused read end
+    // Parent process (Referee)
+    fd[i] = open(fifo_name[i], O_RDONLY);
+    if (fd[i] < 0) {
+    perror("open");
+    exit(EXIT_FAILURE);
+    }
+    } 
+        
         /*Create procesess*/
     }
         
@@ -170,12 +193,8 @@ int main(int argc, char **argv) {
  
 	/*for get data we suppose to get initial energy at first of program , 
 	for update the energy we send energy in last of round so we can be updated with current energy */
-	
-	
-	
-	
+
 	while(should_terminate){
-        sleep(1);
         check_winner();
 		send_getready_signal();
 		// send function to plot
@@ -187,7 +206,7 @@ int main(int argc, char **argv) {
 		/*for alarm we will check alarm flag also */
 		// for case of win some rounds in countinue we will make two variabels counters and check it to value in config file 
 		print_current_array();
-
+        sleep(1);
 	}
     return 0;
     /*#################### Main ################################*/
@@ -224,9 +243,10 @@ void receive_energy(int message_type) {
         int n;
 	Message msg;
 
+
 	while ((n = read(fd[i], &msg, sizeof(Message))) <= 0) {
     	if (n == -1) {
-        	perror("Error reading from FIFO");
+        	perror("Error reading from FIFO hello");
     	}
     	sleep(1);  // Wait and retry
 	}
@@ -250,7 +270,6 @@ void receive_energy(int message_type) {
         } else if(msg.type == message_type && message_type==2 && msg.type==2){ 
         	 // Update energy based on effort
             
-            
             int current_player;
             int current_effort;
             int current_effort_with_weight;
@@ -262,13 +281,12 @@ void receive_energy(int message_type) {
                         break;
                     }
                 }
-
-                current_effort = atoi(msg.content);
+                    current_effort = atoi(msg.content);
                 
-                current_effort_with_weight = current_effort * (current_player + 1);
-                current_energy_team_1[0][current_player] -= current_effort_with_weight;
-                total_effort_team_1 += current_effort_with_weight;
-		printf("current_effort = %d ,current_effort_with_weight = %d  total_effort_team_1= %d (player_id =%d),team_id = %d , player in sorted array =%d\n",current_effort,current_effort_with_weight,total_effort_team_1,msg.player_id,msg.team_id,current_player);
+                    current_effort_with_weight = current_effort * (current_player + 1);
+                    current_energy_team_1[0][current_player] -= current_effort_with_weight;
+                    total_effort_team_1 += current_effort_with_weight;
+                printf("current_effort = %d ,current_effort_with_weight = %d  total_effort_team_1= %d (player_id =%d),team_id = %d , player in sorted array =%d\n",current_effort,current_effort_with_weight,total_effort_team_1,msg.player_id,msg.team_id,current_player);
             } else {  // Team 2
                 for (int j = 0; j < 4; j++) {
                     if (current_energy_team_2[1][j] == msg.player_id) {
@@ -341,7 +359,8 @@ void load_current_energy(int w_time) {
 void send_getready_signal(){
 	//printf("////////////////SIGUSR1///////////////////\n");
 
-/*Here we will kill all SIGUSR1 for all child to know getready message or signal */   
+/*Here we will kill all SIGUSR1 for all child to know getready message or signal */
+        
     	for(int  i = 0 ; i<4 ; i++ ){
     	 	if (kill(team_1.players[i], SIGUSR1) == 0) {
         		//printf("Send signal to process %d From team 1.\n",team_1.players[i]);
@@ -393,6 +412,9 @@ void handle_alarm_max_time() {
 }
 
 void terminate_game(){
+    if (!should_terminate){
+        return;
+    }
     // 1. Close all FIFO file descriptors
     for (int i = 0; i < 8; i++) {
         if (close(fd[i]) == -1) {
@@ -425,99 +447,117 @@ void terminate_game(){
             perror("Failed to kill player from team 2");
         }
     }
+    for (int i = 0; i < 8; i++) {
+        close(player_pipes[i][1]);  // Close write ends first
+    }
     should_terminate = 0;
 }
 
 void check_winner(){
+    if (!should_terminate){
+        return;
+    }
 	if((team_1.score==config.max_score)||(max_win_in_row==team_1.win_counter)){
         printf("Team 1 has won :)\n");
-        //send_winner_message(0);
-        //send_loser_message(1);
         terminate_game();
     }
 	else if((team_2.score==config.max_score)||(max_win_in_row==team_2.win_counter)){
         printf("Team 2 has won :)\n");
-       // send_winner_message(1);
-       // send_loser_message(0);
         terminate_game();
     }
 }
 void check_win_tie(){
 	if (team_1.score>team_2.score){
         printf("Team 1 has won :)\n");
-        //send_winner_message(0);
-        //send_loser_message(1);
     }	else if(team_1.score<team_2.score){
         printf("Team 2 has won :)\n");
-      //  send_winner_message(1);
-      //  send_loser_message(0);
     }
 	else if(team_1.score==team_2.score){
         printf("Tie\n");
-        // Send message
+    }
+}
+void send_status_message(int winning_team) {
+    const char *winner_message = "Winner"; 
+    const char *loser_message = "Loser"; 
+    const char *tie_message = "tie";
+    if (winning_team == 0){
+        for (int i = 0; i < 8; i++) {
+            if (i < 4){
+                int msg_len = strlen(winner_message);
+                ssize_t bytes = write(player_pipes[i][1], winner_message, msg_len);
+                if (bytes == -1) {
+                    perror("Failed to write status to player pipe");
+                } else if (bytes < msg_len) {
+                    fprintf(stderr, "Partial write to player %d\n", i);
+                }
+            }
+            else{
+                int msg_len = strlen(loser_message);
+                ssize_t bytes = write(player_pipes[i][1], loser_message, msg_len);
+                if (bytes == -1) {
+                    perror("Failed to write status to player pipe");
+                } else if (bytes < msg_len) {
+                    fprintf(stderr, "Partial write to player %d\n", i);
+                }
+            }
+        }
+    }
+    else if (winning_team == 1){
+        for (int i = 0; i < 8; i++) {
+            if (i < 4){
+                int msg_len = strlen(loser_message);
+                ssize_t bytes = write(player_pipes[i][1], loser_message, msg_len);
+                if (bytes == -1) {
+                    perror("Failed to write status to player pipe");
+                } else if (bytes < msg_len) {
+                    fprintf(stderr, "Partial write to player %d\n", i);
+                }
+            }
+            else{
+                int msg_len = strlen(winner_message);
+                ssize_t bytes = write(player_pipes[i][1], winner_message, msg_len);
+                if (bytes == -1) {
+                    perror("Failed to write status to player pipe");
+                } else if (bytes < msg_len) {
+                    fprintf(stderr, "Partial write to player %d\n", i);
+                }
+            }
+        }
+    }
+    else if (winning_team == -1){
+        for (int i = 0; i < 8; i++) {
+                int msg_len = strlen(tie_message);
+                ssize_t bytes = write(player_pipes[i][1], tie_message, msg_len);
+                if (bytes == -1) {
+                    perror("Failed to write status to player pipe");
+                } else if (bytes < msg_len) {
+                    fprintf(stderr, "Partial write to player %d\n", i);
+                }
+        }
     }
 }
 void send_winner_message(int winning_team) {
-    Message msg;
-    msg.type = 3;  // Winner message type
-    msg.team_id = winning_team;
-    snprintf(msg.content, sizeof(msg.content), "Your team won!");
-
-    if (winning_team == 0) {
-        // Team 0 players (fd[0]-fd[3])
-        for (int i =0; i<4; i++){
-            msg.player_id = i;
-            msg.player_pid = team_1.players[i];
-            if (write(fd[i], &msg, sizeof(Message)) == -1) perror("Failed to send to player");
-        }
+    const char *message = "Winner";  // Example message (includes null terminator)
+    int message_length = strlen(message);  // Length without null terminator
+    for (int i=0; i < 4; i++){
+        int index = (winning_team == 0) ? i : i+4;
+        write(player_pipes[index][1], message, message_length);
     }
-    else {
-        // Team 1 players (fd[4]-fd[7])
-        for (int i =0; i<4; i++){
-            msg.player_id = i;
-            msg.player_pid = team_1.players[i];
-            if (write(fd[i+4], &msg, sizeof(Message)) == -1) perror("Failed to send to player");
-        }
     }
-}
 void send_loser_message(int losing_team){
-    Message msg;
-    msg.type = 4;  // Loser message type
-    msg.team_id = losing_team;
-    snprintf(msg.content, sizeof(msg.content), "Your team lost.");
-
-    if (losing_team == 0) {
-        // Team 0 players (fd[0]-fd[3])
-        for (int i =0; i<4; i++){
-            msg.player_id = i;
-            msg.player_pid = team_1.players[i];
-            if (write(fd[i], &msg, sizeof(Message)) == -1) perror("Failed to send to player");
-        }
-    }
-    else {
-        // Team 1 players (fd[4]-fd[7])
-        for (int i =0; i<4; i++){
-            msg.player_id = i;
-            msg.player_pid = team_1.players[i];
-            if (write(fd[i+4], &msg, sizeof(Message)) == -1) perror("Failed to send to player");
-        }
+    const char *message = "Loser";  // Example message (includes null terminator)
+    int message_length = strlen(message);  // Length without null terminator
+    for (int i=0; i < 4; i++){
+        int index = (losing_team == 0) ? i : i+4;
+        write(player_pipes[index][1], message, message_length);
     }
 }
 void send_tie_message(){
-    Message msg;
-    msg.type = 5;  // tie message type
-    snprintf(msg.content, sizeof(msg.content), "Tie.");
-    for (int i =0; i<8; i++){
-        if (i < 4){
-            msg.player_id = i;
-            msg.player_pid = team_1.players[i];
-            if (write(fd[i], &msg, sizeof(Message)) == -1) perror("Failed to send to player");
-        }
-        else{
-            msg.player_id = i-4;
-            msg.player_pid = team_2.players[i-4];
-            if (write(fd[i], &msg, sizeof(Message)) == -1) perror("Failed to send to player");
-        }
+    const char *message = "Tie";  // Example message (includes null terminator)
+    int message_length = strlen(message);  // Length without null terminator
+    for (int i=0; i < 4; i++){
+        int index = i;
+        write(player_pipes[index][1], message, message_length);
     }
 }
 void print_current_array(){
@@ -532,7 +572,19 @@ void print_current_array(){
         printf("Team 2:\n");
         for (int i = 0; i < 4; i++) 
             printf("Player %d - Energy: %d\n", current_energy_team_2[1][i], current_energy_team_2[0][i]);
-        printf("Score for team 2: %d\n",team_2.score);             
+        printf("Score for team 2: %d\n",team_2.score);
+        if (team_1.score>team_2.score){
+            printf("Team 1 Won\n");
+            send_status_message(0);
+        }
+        else if (team_1.score < team_2.score){
+            printf("Team 2 Won\n");
+            send_status_message(1);
+        }
+        else{
+            printf("Tie\n");
+            send_status_message(-1);
+        }             
 }   
 
 void printConfig(const Config *cfg) {
@@ -548,6 +600,35 @@ void print_team(const Team *team) {
         printf("Player %d:\n", team->player_id[i]);
         printf("  Initial Energy: %d\n", team->initial_energy[i]);
         printf("  PID: %d\n", team->players[i]);
+    }
+}
+
+int get_random_in_range(int range_min, int range_max) {
+    // Initialize random seed (do this once at program start)
+    static int initialized = 0;
+    if (!initialized) {
+        srand(time(NULL));
+        initialized = 1;
+    }
+    
+    // Calculate random number within range
+    int range = range_max - range_min + 1;
+    int random_num = rand() % range + range_min;
+    
+    return random_num;
+}
+
+void player_fallen(int team_id, int player_id){
+    int range_min = config.re_join_time_min;
+    int range_max = config.re_join_time_max;
+    int sleep_time = get_random_in_range(range_min, range_max);
+    if (team_id == 0){
+        printf("player with id %d in team %d has fallen.\n", player_id, team_id+1);
+        kill(team_1.players[player_id], SIGALRM);
+    }
+    else{
+        printf("player with id %d in team %d has fallen.\n", player_id, team_id+1);
+        kill(team_2.players[player_id], SIGALRM);
     }
 }
 

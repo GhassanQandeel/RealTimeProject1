@@ -26,9 +26,11 @@ void handle_getready();
 void handle_start_game();
 void send_message(int message_type,int content);
 int generate_energy(int id);
+void handle_sleep();
+int get_random_in_range(int range_min, int range_max);
 
 
-int fd_read, fd_write;
+int fd;
 int player_id,team_id;
 pid_t player;
 
@@ -36,31 +38,26 @@ pid_t player;
 int main (int argc, char **argv){
 
 
-   if (argc < 5) {
-        fprintf(stderr, "Usage: %s <fifo_name>\n", argv[0]);
+    if (argc < 6) {  // Now expects 5 args + pipe FD
+        fprintf(stderr, "Usage: %s <config> <fifo> <player_id> <team_id> <pipe_fd>\n", argv[0]);
         return EXIT_FAILURE;
-   }
+    }
    if (load_config(argv[1], &config) != 0) {
         fprintf(stderr, "Failed to load config file.\n");
         return EXIT_FAILURE;
    }
    
-    fd_write = open(argv[2], O_WRONLY);
-    if (fd_write == -1) {
+    fd = open(argv[2], O_WRONLY);
+    if (fd == -1) {
         perror("open");
         return EXIT_FAILURE;
     }
 
-     // Open FIFO for reading (from referee)
-     fd_read = open(argv[2], O_RDONLY | O_NONBLOCK);
-     if (fd_read == -1) {
-         perror("open read FIFO");
-         close(fd_write);
-         return EXIT_FAILURE;
-     }
    
    player_id=atoi(argv[3]);
    team_id=atoi(argv[4]);
+
+   int pipe_fd = atoi(argv[5]);
    
     
 
@@ -69,7 +66,10 @@ int main (int argc, char **argv){
     send_message(1,generate_energy(player_id));
 
     
-    
+    if (sigset(SIGALRM,handle_sleep) == SIG_ERR){
+        perror("NO SLEEP LIKE ME");
+        exit(SIGQUIT);
+    }
     
     if ( sigset(SIGUSR1, handle_getready) == SIG_ERR ) {
     perror("Sigset can not set SIGUSR1");
@@ -82,25 +82,19 @@ int main (int argc, char **argv){
     }
 
     signal(SIGINT, handle_sigint);
-    
+
+    char buffer[8];  // Buffer to store the received message
     while (keep_running) {
-        pause();
-        // Message msg;
-        // int n = read(fd_read, &msg, sizeof(Message));
-        
-        // if (n > 0) {
-        //     if (msg.type == 3) { // Winner message
-        //         printf("Player %d: We won the game!\n", player_id);
-        //         keep_running = 0;
-        //     } 
-        //     else if (msg.type == 4) { // Loser message
-        //         printf("Player %d: We lost the game.\n", player_id);
-        //         keep_running = 0;
-        //     }
-        // }
+        ssize_t bytes_read = read(pipe_fd, buffer, sizeof(buffer - 1));
+        if (bytes_read > 0) {
+            buffer[bytes_read] = '\0';
+            printf("player %d in team %d is a %s\n",player_id, team_id+1,buffer);
+        }
+
+        //pause();
     }
-    close(fd_read);
-    close(fd_write);
+    close(pipe_fd);
+    close(fd);
     return 0;
 }
 
@@ -121,7 +115,7 @@ void send_message(int message_type,int content){
     snprintf(msg.content, sizeof(msg.content), "%d", content);
 
     // Send message through FIFO
-    if (write(fd_write, &msg, sizeof(Message)) == -1) {
+    if (write(fd, &msg, sizeof(Message)) == -1) {
         perror("write");
         
     }
@@ -156,5 +150,38 @@ void printConfig(const Config *cfg) {
 
 void handle_sigint(int sig) {
     keep_running = 0;  // Set flag to exit the loop
+}
+
+void handle_sleep() {
+    int sleep_time = get_random_in_range(1, config.max_score);
+    
+    // Step 1: Block all signals
+    sigset_t mask, oldmask;
+    sigfillset(&mask);  // Add all signals to the set
+    sigprocmask(SIG_BLOCK, &mask, &oldmask);  // Block them
+    
+    // Step 2: Sleep uninterruptibly for 10 seconds
+    unsigned int remaining = 10;
+    while (remaining > 0) {
+        remaining = sleep(remaining);  // sleep() returns unslept time if interrupted
+    }
+    
+    // Step 3: Restore original signal mask
+    sigprocmask(SIG_SETMASK, &oldmask, NULL);
+}
+
+int get_random_in_range(int range_min, int range_max) {
+    // Initialize random seed (do this once at program start)
+    static int initialized = 0;
+    if (!initialized) {
+        srand(time(NULL));
+        initialized = 1;
+    }
+    
+    // Calculate random number within range
+    int range = range_max - range_min + 1;
+    int random_num = rand() % range + range_min;
+    
+    return random_num;
 }
 

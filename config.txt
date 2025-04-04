@@ -1,8 +1,8 @@
 # Configuration for Rope Pulling Game Simulation
 
 # Game settings
-max_score=6                   # Maximum score to end the game
-max_time=10                  # Maximum time (in seconds) for the game
+max_score=10                   # Maximum score to end the game
+max_time=15                  # Maximum time (in seconds) for the game
 
 # User Defined Range for High level of energy generated
 
