@@ -1,8 +1,8 @@
 # Configuration for Rope Pulling Game Simulation
 
 # Game settings
-max_score=10                   # Maximum score to end the game
-max_time=15                  # Maximum time (in seconds) for the game
+max_score=15                 # Maximum score to end the game
+max_time=20                 # Maximum time (in seconds) for the game
 
 # User Defined Range for High level of energy generated
 
@@ -18,8 +18,8 @@ initial_energy_min_d=48
 
 # Rate of Energy Decrease 
 
-rate_of_decrease_min=1        	# Minimum Rate of Decrease
-rate_of_decrease_max=3		# Maximum Rate of Decrease
+rate_of_decrease_min=0.5        	# Minimum Rate of Decrease
+rate_of_decrease_max=1		# Maximum Rate of Decrease
 
 # Range of re-join the Pulling Game 
 

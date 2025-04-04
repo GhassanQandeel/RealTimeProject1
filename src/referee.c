@@ -14,8 +14,12 @@ int player_pipes[8][2]; // [player][0=read, 1=write]
 int player_fell = 0;
 int team_id_fall = 0;
 int player_id_fall = 0;
+int prev_energy = 0;
 
-volatile sig_atomic_t should_terminate = 1; 
+typedef void (*sighandler_t)(int);
+sighandler_t sigset(int sig, sighandler_t disp);
+
+int should_terminate = 1; 
 
 Config config;
 
@@ -37,6 +41,7 @@ void send_loser_message(int team);
 void send_tie_message();
 int get_random_in_range(int range_min, int range_max);
 void player_fallen();
+void handle_woken();
 
 int  first_energy=0;
 
@@ -54,11 +59,16 @@ int player_id;
 int fd[8];
 int first_time=0;
 int time_is_over=0;
+
 /* Last update */
 /* Check end game condition and round update*/
 /* put in if stop condiition , after time end ,check how larger ,  */
 /* Waht should do*/
 int main(int argc, char **argv) {
+    if ( sigset(SIGUSR1, handle_woken) == SIG_ERR ) {
+        perror("Sigset can not set SIGUSR1");
+        exit(SIGQUIT);
+        }
 
 
     if (argc < 2) {
@@ -193,8 +203,15 @@ int main(int argc, char **argv) {
  
 	/*for get data we suppose to get initial energy at first of program , 
 	for update the energy we send energy in last of round so we can be updated with current energy */
-
+    int timer = get_random_in_range(3, (config.max_score/2) + 1);
+    int count = 0;
+    team_id_fall = get_random_in_range(0,1);
+    player_id_fall = get_random_in_range(0,3);
 	while(should_terminate){
+        if (count == timer){
+            player_fallen(team_id_fall,player_id_fall);
+            player_fell = 1;
+        }
         check_winner();
 		send_getready_signal();
 		// send function to plot
@@ -207,6 +224,7 @@ int main(int argc, char **argv) {
 		// for case of win some rounds in countinue we will make two variabels counters and check it to value in config file 
 		print_current_array();
         sleep(1);
+        count++;
 	}
     return 0;
     /*#################### Main ################################*/
@@ -238,19 +256,14 @@ void receive_energy(int message_type) {
     }
     int total_effort_team_1 = 0;
     int total_effort_team_2 = 0;
-
+    
     for (int i = 0; i < 8; i++) {
-        int n;
-	Message msg;
+	    Message msg;
 
-
-	while ((n = read(fd[i], &msg, sizeof(Message))) <= 0) {
-    	if (n == -1) {
-        	perror("Error reading from FIFO hello");
-    	}
-    	sleep(1);  // Wait and retry
-	}
-
+        if (i == (player_id_fall +( team_id_fall * 4)) && player_fell == 1)
+            continue;
+        
+        read(fd[i], &msg, sizeof(Message));
         if (msg.type == message_type && message_type==1 && msg.type==1) {  // Initial energy received
             if (msg.team_id == 0) {
                 team_1.team_id = msg.team_id;
@@ -267,41 +280,42 @@ void receive_energy(int message_type) {
             	team_2.score=0;
             	team_2.win_counter=0;
             }
-        } else if(msg.type == message_type && message_type==2 && msg.type==2){ 
-        	 // Update energy based on effort
-            
-            int current_player;
-            int current_effort;
-            int current_effort_with_weight;
+        } 
+        else if(msg.type == message_type && message_type==2 && msg.type==2){ 
+            // Update energy based on effort
+               int current_player;
+               int current_effort;
+               int current_effort_with_weight;
 
-            if (msg.team_id == 0) {  // Team 1
-                for (int j = 0; j < 4; j++) {
-                    if (current_energy_team_1[1][j] == msg.player_id) {
-                        current_player = j;
-                        break;
-                    }
-                }
-                    current_effort = atoi(msg.content);
-                
-                    current_effort_with_weight = current_effort * (current_player + 1);
-                    current_energy_team_1[0][current_player] -= current_effort_with_weight;
-                    total_effort_team_1 += current_effort_with_weight;
-                printf("current_effort = %d ,current_effort_with_weight = %d  total_effort_team_1= %d (player_id =%d),team_id = %d , player in sorted array =%d\n",current_effort,current_effort_with_weight,total_effort_team_1,msg.player_id,msg.team_id,current_player);
-            } else {  // Team 2
-                for (int j = 0; j < 4; j++) {
-                    if (current_energy_team_2[1][j] == msg.player_id) {
-                        current_player = j;
-                        break;
-                    }
-                }
-
-                current_effort = atoi(msg.content);
-                current_effort_with_weight = current_effort * (current_player + 1);
-                current_energy_team_2[0][current_player] -= current_effort_with_weight;
-                total_effort_team_2 += current_effort_with_weight;
-                printf("current_effort = %d,current_effort_with_weight = %d  total_effort_team_2= %d (player_id =%d),team_id = %d , player in sorted array =%d\n",current_effort,current_effort_with_weight,total_effort_team_2,msg.player_id,msg.team_id,current_player);
-            }
-        }
+           
+               if (msg.team_id == 0) {  // Team 1
+                   for (int j = 0; j < 4; j++) {
+                       if (current_energy_team_1[1][j] == msg.player_id) {
+                           current_player = j;
+                           break;
+                       }
+                   }
+                       current_effort = atoi(msg.content);
+                   
+                       current_effort_with_weight = current_effort * (current_player + 1);
+                       current_energy_team_1[0][current_player] -= current_effort_with_weight;
+                       total_effort_team_1 += current_effort_with_weight;
+                       printf("current_effort = %d ,current_effort_with_weight = %d  total_effort_team_1= %d (player_id =%d),team_id = %d , player in sorted array =%d\n",current_effort,current_effort_with_weight,total_effort_team_1,msg.player_id,msg.team_id,current_player);
+               } else {  // Team 2
+                   for (int j = 0; j < 4; j++) {
+                       if (current_energy_team_2[1][j] == msg.player_id) {
+                           current_player = j;
+                           break;
+                       }
+                   }
+   
+                   current_effort = atoi(msg.content);
+                   current_effort_with_weight = current_effort * (current_player + 1);
+                   current_energy_team_2[0][current_player] -= current_effort_with_weight;
+                   total_effort_team_2 += current_effort_with_weight;
+                   printf("current_effort = %d,current_effort_with_weight = %d  total_effort_team_2= %d (player_id =%d),team_id = %d , player in sorted array =%d\n",current_effort,current_effort_with_weight,total_effort_team_2,msg.player_id,msg.team_id,current_player);
+               }
+       }
     }
     difference_effort=(total_effort_team_1-total_effort_team_2);
     if (difference_effort > 0){
@@ -619,16 +633,55 @@ int get_random_in_range(int range_min, int range_max) {
 }
 
 void player_fallen(int team_id, int player_id){
-    int range_min = config.re_join_time_min;
-    int range_max = config.re_join_time_max;
-    int sleep_time = get_random_in_range(range_min, range_max);
+
     if (team_id == 0){
         printf("player with id %d in team %d has fallen.\n", player_id, team_id+1);
         kill(team_1.players[player_id], SIGALRM);
+        int current_player;
+        for (int j =0; j < 4; j++){
+            if (current_energy_team_1[1][j] == player_id) {
+                current_player = j;
+                break;
+            }
+        }
+        prev_energy = current_energy_team_1[0][current_player];
+        current_energy_team_1[0][current_player] = 0;
     }
     else{
         printf("player with id %d in team %d has fallen.\n", player_id, team_id+1);
         kill(team_2.players[player_id], SIGALRM);
+        int current_player;
+        for (int j =0; j < 4; j++){
+            if (current_energy_team_2[1][j] == player_id) {
+                current_player = j;
+                break;
+            }
+        }
+        prev_energy = current_energy_team_1[0][current_player];
+        current_energy_team_2[0][current_player] = 0;
+    }
+}
+void handle_woken(){
+    player_fell = 0;
+    if (team_id_fall == 0){
+        int current_player;
+        for (int j =0; j < 4; j++){
+            if (current_energy_team_1[1][j] == player_id_fall) {
+                current_player = j;
+                break;
+            }
+        }
+        current_energy_team_1[0][current_player] = prev_energy;
+    }
+    else{
+        int current_player;
+        for (int j =0; j < 4; j++){
+            if (current_energy_team_2[1][j] == player_id_fall) {
+                current_player = j;
+                break;
+            }
+        }
+        current_energy_team_2[0][current_player] = prev_energy;
     }
 }
 

@@ -15,11 +15,14 @@
 typedef void (*sighandler_t)(int);
 sighandler_t sigset(int sig, sighandler_t disp);
 
+int sighold(int sig);
+int sigrelse(int sig);
+
 Config config;
 int NUM_PLAYERS_PER_TEAM=4;
+pid_t parent_id; // Declare globally (if needed)
 
-
-volatile sig_atomic_t keep_running = 1;  // Global flag to control the loop
+int keep_running = 1;  // Global flag to control the loop
 
 void handle_sigint(int sig);
 void handle_getready();
@@ -37,6 +40,7 @@ pid_t player;
 
 int main (int argc, char **argv){
 
+    parent_id = getppid(); // Now works (runtime initialization)
 
     if (argc < 6) {  // Now expects 5 args + pipe FD
         fprintf(stderr, "Usage: %s <config> <fifo> <player_id> <team_id> <pipe_fd>\n", argv[0]);
@@ -58,9 +62,6 @@ int main (int argc, char **argv){
    team_id=atoi(argv[4]);
 
    int pipe_fd = atoi(argv[5]);
-   
-    
-
 
     // here we generate initial energy and send it to referee 
     send_message(1,generate_energy(player_id));
@@ -91,7 +92,6 @@ int main (int argc, char **argv){
             printf("player %d in team %d is a %s\n",player_id, team_id+1,buffer);
         }
 
-        //pause();
     }
     close(pipe_fd);
     close(fd);
@@ -153,21 +153,15 @@ void handle_sigint(int sig) {
 }
 
 void handle_sleep() {
-    int sleep_time = get_random_in_range(1, config.max_score);
-    
-    // Step 1: Block all signals
-    sigset_t mask, oldmask;
-    sigfillset(&mask);  // Add all signals to the set
-    sigprocmask(SIG_BLOCK, &mask, &oldmask);  // Block them
-    
-    // Step 2: Sleep uninterruptibly for 10 seconds
-    unsigned int remaining = 10;
-    while (remaining > 0) {
-        remaining = sleep(remaining);  // sleep() returns unslept time if interrupted
-    }
-    
-    // Step 3: Restore original signal mask
-    sigprocmask(SIG_SETMASK, &oldmask, NULL);
+    int range_min = config.re_join_time_min;
+    int range_max = config.re_join_time_max;
+    int sleep_time = get_random_in_range(range_min, range_max);
+    sighold(SIGUSR1);
+    sighold(SIGUSR2);
+    sleep(sleep_time);
+    sigrelse(SIGUSR1);
+    sigrelse(SIGUSR2);
+    kill(parent_id, SIGUSR1);
 }
 
 int get_random_in_range(int range_min, int range_max) {
