@@ -41,6 +41,14 @@ typedef struct {
     char content[20];
 } Message;
 
+typedef struct {
+    int current_effort_team_1[2][4];
+    int current_effort_team_2[2][4];
+    int score_team_1;
+    int score_team_2;
+} Opengl_Message;
+
+
 
 int load_config(const char *filename, Config *config);
 

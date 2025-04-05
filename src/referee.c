@@ -16,6 +16,8 @@ int team_id_fall = 0;
 int player_id_fall = 0;
 int prev_energy = 0;
 
+
+
 typedef void (*sighandler_t)(int);
 sighandler_t sigset(int sig, sighandler_t disp);
 
@@ -23,25 +25,35 @@ int should_terminate = 1;
 
 Config config;
 
+
+
+void send_data_opengl();
 void printConfig(const Config *cfg);
 void print_team(const Team *team);
-void handle_alarm_max_time();
-void load_current_energy(int w_time);
 void sort_main_array(int current_energy_team[2][4]);
-void send_getready_signal();
-void send_start_game_signal();
-void receive_energy(int message_type);
-void print_current_array();
-void terminate_game();
+
+void handle_alarm_max_time();
+void handle_woken();
+
+void load_current_energy(int w_time);
+
 void check_winner();
 void check_winner_in_row();
 void check_win_tie();
+
+void send_getready_signal();
+void send_start_game_signal();
+
+void print_current_array();
+void terminate_game();
+
 void send_winner_message(int team);
 void send_loser_message(int team);
 void send_tie_message();
 int get_random_in_range(int range_min, int range_max);
 void player_fallen();
-void handle_woken();
+
+void receive_energy(int message_type);
 
 int  first_energy=0;
 
@@ -49,7 +61,9 @@ int max_win_in_row;
 int difference_effort=0;/*if pos then team 1 win*/
 
 char fifo_name[8][50];
+char fifo_opengl[50];
 pid_t player[8];
+pid_t opengl_process;
 Team team_1;
 Team team_2;
 int current_energy_team_1[2][4];/*our map to sort the player with largest energy, and there id in team struct */
@@ -57,6 +71,7 @@ int current_energy_team_2[2][4];/*to give us good control in teams energy */
 int team_id;
 int player_id;
 int fd[8];
+int fd_opengl;
 int first_time=0;
 int time_is_over=0;
 
@@ -97,6 +112,9 @@ int main(int argc, char **argv) {
             exit(EXIT_FAILURE);
         }
     }
+    
+    
+    
 
     for(int  i = 0 ; i<8 ; i++ ){
     /* FIFO Creation */
@@ -115,6 +133,31 @@ int main(int argc, char **argv) {
         exit(1);
     }
     }
+    
+    snprintf(fifo_opengl, sizeof(fifo_opengl),"/tmp/fifo_opengl");
+    if (mkfifo(fifo_opengl, 0666) == -1) {
+        perror("mkfifo_opengl");
+        exit(1);
+    }
+   
+    
+    
+	
+    if ((opengl_process = fork()) == 0){
+      execlp("./bin/opengl","./bin/opengl",fifo_opengl , NULL);
+      perror("execlp failed for player");
+      exit(EXIT_FAILURE);
+    }else{
+     fd_opengl = open(fifo_opengl,  O_WRONLY);
+    if (fd_opengl < 0) {
+    perror("open");
+    exit(EXIT_FAILURE);
+    }
+    }
+    
+    
+    
+    
     /* FIFO Creation */
 
     
@@ -138,8 +181,8 @@ int main(int argc, char **argv) {
 
 
         // Convert read-FD to string and pass to player
-        char fd_str[16];
-        snprintf(fd_str, sizeof(fd_str), "%d", player_pipes[i][0]);
+       char fd_str[16];
+       snprintf(fd_str, sizeof(fd_str), "%d", player_pipes[i][0]);
 
        
       // Child process (Player)
@@ -161,7 +204,9 @@ int main(int argc, char **argv) {
     perror("open");
     exit(EXIT_FAILURE);
     }
-    } 
+    
+    }
+     
         
         /*Create procesess*/
     }
@@ -184,6 +229,7 @@ int main(int argc, char **argv) {
 	
 	
 	load_current_energy(0);
+	send_data_opengl();
 	printf("|||||||||||||||||||||||||First time|||||||||||||||||||||||\n");
 	print_current_array();
 	printf("|||||||||||||||||||||||||First time|||||||||||||||||||||||\n");
@@ -191,6 +237,7 @@ int main(int argc, char **argv) {
 	send_start_game_signal();
 	receive_energy(2);
 	load_current_energy(1);
+	send_data_opengl();
 	printf("|||||||||||||||||||||||||Second time|||||||||||||||||||||||\n");
 	print_current_array();
 	printf("|||||||||||||||||||||||||Second time|||||||||||||||||||||||\n");
@@ -215,9 +262,12 @@ int main(int argc, char **argv) {
         check_winner();
 		send_getready_signal();
 		// send function to plot
+		send_data_opengl();
 		send_start_game_signal();
 		receive_energy(2);
+		send_data_opengl();
 		load_current_energy(1);
+		send_data_opengl();
 		//check if exceed the thresold of win round 
 		// if yes incerement score for team 
 		/*for alarm we will check alarm flag also */
@@ -313,6 +363,7 @@ void receive_energy(int message_type) {
                    current_effort_with_weight = current_effort * (current_player + 1);
                    current_energy_team_2[0][current_player] -= current_effort_with_weight;
                    total_effort_team_2 += current_effort_with_weight;
+                   //total_effort_team_2 = 0;
                    printf("current_effort = %d,current_effort_with_weight = %d  total_effort_team_2= %d (player_id =%d),team_id = %d , player in sorted array =%d\n",current_effort,current_effort_with_weight,total_effort_team_2,msg.player_id,msg.team_id,current_player);
                }
        }
@@ -338,6 +389,19 @@ void receive_energy(int message_type) {
         team_2.win_counter++;
         team_1.win_counter=0;
  	}
+ 	
+ 	if (team_1.score>team_2.score){
+            printf("Team 1 Won\n");
+            send_status_message(0);
+        }
+        else if (team_1.score < team_2.score){
+            printf("Team 2 Won\n");
+            send_status_message(1);
+        }
+        else{
+            printf("Tie\n");
+            send_status_message(-1);
+        }             
     difference_effort=0;
     // If the difference_effort == 0 do nothing
 }
@@ -435,6 +499,10 @@ void terminate_game(){
             perror("Failed to close FIFO");
         }
     }
+    
+    if (close(fd_opengl) == -1) {
+            perror("Failed to close FIFO");
+            }
 
     // 2. Remove (unlink) FIFO files
     for (int i = 0; i < 8; i++) {
@@ -444,6 +512,11 @@ void terminate_game(){
             printf("Removed FIFO: %s\n", fifo_name[i]);
         }
     }
+    if (unlink(fifo_opengl) == -1) {
+            perror("Failed to unlink FIFO");
+        } else {
+            printf("Removed FIFO: %s\n", fifo_opengl);
+        }
     
     // 3. Kill all player processes
     for (int i = 0; i < 4; i++) {
@@ -461,9 +534,16 @@ void terminate_game(){
             perror("Failed to kill player from team 2");
         }
     }
+    
+    if (kill(opengl_process, SIGTERM) == 0) {
+            printf("Killed player with PID %d from team 2.\n", opengl_process);
+        } else {
+            perror("Failed to kill opengl_process");}
+            
     for (int i = 0; i < 8; i++) {
         close(player_pipes[i][1]);  // Close write ends first
     }
+    
     should_terminate = 0;
 }
 
@@ -587,18 +667,7 @@ void print_current_array(){
         for (int i = 0; i < 4; i++) 
             printf("Player %d - Energy: %d\n", current_energy_team_2[1][i], current_energy_team_2[0][i]);
         printf("Score for team 2: %d\n",team_2.score);
-        if (team_1.score>team_2.score){
-            printf("Team 1 Won\n");
-            send_status_message(0);
-        }
-        else if (team_1.score < team_2.score){
-            printf("Team 2 Won\n");
-            send_status_message(1);
-        }
-        else{
-            printf("Tie\n");
-            send_status_message(-1);
-        }             
+        
 }   
 
 void printConfig(const Config *cfg) {
@@ -682,6 +751,31 @@ void handle_woken(){
             }
         }
         current_energy_team_2[0][current_player] = prev_energy;
+    }
+}
+void send_data_opengl(){
+Opengl_Message o_message;
+
+    // Fill current_effort_team_1 with current_energy_team_1 data
+    for (int i = 0; i < 2; i++) {
+        for (int j = 0; j < 4; j++) {
+            o_message.current_effort_team_1[i][j] = current_energy_team_1[i][j];
+        }
+    }
+
+    // Fill current_effort_team_2 with current_energy_team_2 data
+    for (int i = 0; i < 2; i++) {
+        for (int j = 0; j < 4; j++) {
+            o_message.current_effort_team_2[i][j] = current_energy_team_2[i][j];
+        }
+    }
+
+    // Assign scores to the message
+    o_message.score_team_1 = team_1.score;
+    o_message.score_team_2 = team_2.score;
+	if (write(fd_opengl, &o_message, sizeof(o_message)) == -1) {
+        perror("write");
+        
     }
 }
 
