@@ -14,6 +14,7 @@
 #include <fcntl.h>
 #include <signal.h>
 #include "../include/config.h"
+#include <string.h>
 char fifo_name[50];
 
 #define SCREEN_WIDTH 800

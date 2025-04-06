@@ -54,6 +54,7 @@ int get_random_in_range(int range_min, int range_max);
 void player_fallen();
 
 void receive_energy(int message_type);
+void send_status_message(int winning_team);
 
 int  first_energy=0;
 
